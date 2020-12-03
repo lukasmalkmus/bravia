@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// Custom Installation Services
-// https://pro-bravia.sony.net/develop/integrate/ssip/overview/index.html
-
 const (
 	_cmdTimeout  = 2 * time.Second
 	_dialTimeout = 5 * time.Second
@@ -26,38 +23,37 @@ type Bravia struct {
 }
 
 // Bravia Creates a new Bravia and attempts to connect to device
-func NewBravia(addr string) *Bravia {
-	s := Bravia{
+func NewBravia(addr string) (*Bravia, error) {
+	b := &Bravia{
 		address: addr,
 		answer:  make(chan *Message),
 	}
-	err := s.reconnect()
-	if nil != err {
-		return nil
+
+	if err := b.reconnect(); nil != err {
+		return nil, err
 	}
 
 	go func() {
 		response := make([]byte, 24)
 		for {
-			_, err := io.ReadFull(s.conn, response)
-			if err != nil {
+			if _, err := io.ReadFull(b.conn, response); err != nil {
 				time.Sleep(_dialRetry)
-				s.reconnect()
+				_ = b.reconnect()
 				continue
 			}
 			cmd := newMessage(string(response))
 			switch cmd.CommandType {
 			case Notify:
-				s.sendNotification(cmd)
+				b.sendNotification(cmd)
 			case Answer:
-				s.answer <- cmd
+				b.answer <- cmd
 			default:
-				s.reconnect()
+				_ = b.reconnect()
 			}
 		}
 	}()
 
-	return &s
+	return b, nil
 }
 
 func (s *Bravia) sendNotification(cmd *Message) {
@@ -103,10 +99,9 @@ func (s *Bravia) exec(cmd *Message) (*Message, error) {
 	if cmd == nil {
 		return nil, errors.New("invalid command")
 	}
+
 	str := fmt.Sprintf("*S%c%s%s\n", cmd.CommandType, cmd.Command, cmd.Paramaters)
-	fmt.Printf("cmd: %s\n", str)
-	_, err := s.conn.Write([]byte(str))
-	if err != nil {
+	if _, err := s.conn.Write([]byte(str)); err != nil {
 		return nil, err
 	}
 

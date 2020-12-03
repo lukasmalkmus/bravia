@@ -61,7 +61,6 @@ type Message struct {
 
 func newMessage(cmd string) *Message {
 	if len(cmd) != 24 || cmd[0] != '*' || cmd[1] != 'S' || cmd[23] != '\n' {
-		fmt.Printf("cmd '%s'\n", cmd)
 		return nil
 	}
 
